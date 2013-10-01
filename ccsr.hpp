@@ -78,10 +78,7 @@ class matrix {
         std::vector< val_t > val;
 
         struct shift {
-            template <class Sig>
-            struct result {
-                typedef col_t type;
-            };
+            typedef col_t result_type;
 
             col_t s;
 
@@ -162,20 +159,18 @@ class matrix {
                     const row_t *r, const col_t *c, const val_t *v)
             {
                 for(col_t i = row_begin, j = 0; i < row_end; ++i, ++j) {
+                    shift s(-i);
+
                     auto range = boost::make_tuple(
                             boost::make_zip_iterator(
                                 boost::make_tuple(
-                                    boost::make_transform_iterator(
-                                        c + r[j], shift(-i)
-                                        ),
+                                    boost::make_transform_iterator(c + r[j], s),
                                     v + r[j])
                                 ),
                             boost::make_zip_iterator(
                                 boost::make_tuple(
-                                    boost::make_transform_iterator(
-                                        c + r[j + 1], shift(-i)
-                                        ),
-                                    v + r[j + 1])
+                                    boost::make_transform_iterator(c + r[j+1], s),
+                                    v + r[j+1])
                                 )
                             );
 
@@ -219,16 +214,14 @@ class matrix {
         std::unique_ptr<builder_t> builder;
 
     public:
-        typedef boost::transform_iterator<
-                    shift, typename std::vector<col_t>::const_iterator
-                > column_iterator;
-
-        typedef boost::tuple<
-                    column_iterator, typename std::vector<val_t>::const_iterator
-                > const_iterator_tuple;
-
-        typedef boost::zip_iterator<const_iterator_tuple>
-                const_row_iterator;
+        typedef boost::zip_iterator<
+                    boost::tuple<
+                        boost::transform_iterator<
+                            shift, typename std::vector<col_t>::const_iterator
+                        >,
+                        typename std::vector<val_t>::const_iterator
+                    >
+                > const_row_iterator;
 
         /// Constructor.
         matrix(size_t rows, size_t cols, val_t eps = 1e-5)
@@ -262,9 +255,12 @@ class matrix {
         const_row_iterator begin(size_t i) const {
             assert(!builder && i < rows);
 
-            return const_row_iterator(
-                    const_iterator_tuple(
-                        column_iterator(col.begin() + row[idx[i]], shift(i)),
+            return boost::make_zip_iterator(
+                    boost::make_tuple(
+                        boost::make_transform_iterator(
+                            col.begin() + row[idx[i]],
+                            shift(i)
+                            ),
                         val.begin() + row[idx[i]]
                         )
                     );
@@ -274,9 +270,12 @@ class matrix {
         const_row_iterator end(size_t i) const {
             assert(!builder && i < rows);
 
-            return const_row_iterator(
-                    const_iterator_tuple(
-                        column_iterator(col.begin() + row[idx[i] + 1], shift(i)),
+            return boost::make_zip_iterator(
+                    boost::make_tuple(
+                        boost::make_transform_iterator(
+                            col.begin() + row[idx[i] + 1],
+                            shift(i)
+                            ),
                         val.begin() + row[idx[i] + 1]
                         )
                     );
