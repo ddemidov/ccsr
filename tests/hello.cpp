@@ -4,7 +4,7 @@
 int main() {
     const int n = 4;
 
-    ccsr::matrix_builder<double, int, int> B;
+    ccsr::matrix<double, int, int> A(n * n, n * n);
 
     for(int i = 0, idx = 0; i < n; ++i) {
         for(int j = 0; j < n; ++j, ++idx) {
@@ -30,13 +30,11 @@ int main() {
             }
 
             row.push_back(col.size());
-            B.insert(idx, idx + 1, row.data(), col.data(), val.data());
+            A.insert(idx, idx + 1, row.data(), col.data(), val.data());
         }
     }
 
-    std::cout << B.unique_rows() << std::endl;
-
-    ccsr::matrix<double, int, int> A(n*n, n*n, B);
+    std::cout << "Unique rows: " << A.finish() << std::endl;
 
     for(size_t row = 0; row < n * n; ++row) {
         for(auto i = A.begin(row); i != A.end(row); ++i)
