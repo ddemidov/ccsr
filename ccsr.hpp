@@ -61,6 +61,11 @@ inline size_t hash(const T &v) {
 
 template <typename T>
 struct shift {
+    template <class Sig>
+    struct result {
+        typedef T type;
+    };
+
     T s;
     shift(T s) : s(s) {}
 
