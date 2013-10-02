@@ -6,8 +6,8 @@
  * \author Denis Demidov <ddemidov@ksu.ru>
  * \brief  Compressed CSR format composition.
  *
- * Lossy compression for CSR format. Stores unique matrix rows, where
- * uniqueness is determined approximately. If the precision loss is not
+ * Lossy compression for CSR sparse matrix format. Stores unique matrix rows,
+ * where uniqueness is determined approximately. If the precision loss is not
  * important (e.g. coefficients come from an experiment with incorporated
  * observation error), it may result in significant storage savings for large
  * matrices.
