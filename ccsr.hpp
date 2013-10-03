@@ -1,16 +1,39 @@
 #ifndef CCSR_HPP
 #define CCSR_HPP
 
+/*
+The MIT License
+
+Copyright (c) 2013 Denis Demidov <ddemidov@ksu.ru>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
 /**
  * \file   ccsr.hpp
  * \author Denis Demidov <ddemidov@ksu.ru>
- * \brief  Compressed CSR format composition.
+ * \brief  Lossy compression for CSR sparse matrix format.
  *
- * Lossy compression for CSR sparse matrix format. Stores unique matrix rows,
- * where uniqueness is determined approximately. If the precision loss is not
- * important (e.g. coefficients come from an experiment with incorporated
- * observation error), it may result in significant storage savings for large
- * matrices.
+ * Stores unique matrix rows, where uniqueness is determined approximately.
+ * If the precision loss is not important (e.g. coefficients come from an
+ * experiment with incorporated observation error), it may result in
+ * significant storage savings for large matrices.
  */
 
 
@@ -26,6 +49,8 @@
 #include <boost/iterator/zip_iterator.hpp>
 
 namespace ccsr {
+
+namespace detail {
 
 template <typename T>
 struct hash_impl {
@@ -54,11 +79,20 @@ struct hash_impl<float> {
     }
 };
 
-template <class T>
-inline size_t hash(const T &v) {
-    return hash_impl<T>::get(v);
 }
 
+template <class T>
+inline size_t hash(const T &v) {
+    return detail::hash_impl<T>::get(v);
+}
+
+/// Lossy compression for CSR sparse matrix format.
+/**
+ * Stores unique matrix rows, where uniqueness is determined approximately.
+ * If the precision loss is not important (e.g. coefficients come from an
+ * experiment with incorporated observation error), it may result in
+ * significant storage savings for large matrices.
+*/
 template <
     typename val_t = double,
     typename row_t = size_t,
@@ -76,6 +110,7 @@ class matrix {
         std::vector< col_t > col;
         std::vector< val_t > val;
 
+        // Returns operand incremented by a given value.
         struct shift {
             typedef col_t result_type;
 
@@ -88,12 +123,14 @@ class matrix {
             }
         };
 
+        // Extracts and stores unique rows.
         struct builder_t {
             std::deque< idx_t > idx;
             std::deque< row_t > row;
             std::deque< col_t > col;
             std::deque< val_t > val;
 
+            // Hashes and compares matrix rows.
             struct row_hasher {
                 val_t eps;
 
@@ -242,13 +279,22 @@ class matrix {
         {
         }
 
+        /// Store matrix slice.
+        /**
+         * May accept whole matrix, or just a slice of matrix rows.
+         */
         void insert(col_t row_begin, col_t row_end,
                 const row_t *r, const col_t *c, const val_t *v)
         {
+            assert(builder);
+
             builder->insert(row_begin, row_end, r, c, v);
         }
 
+        /// All rows have been processed; finalize the construction phase.
         size_t finish() {
+            assert(builder);
+
             idx.assign(builder->idx.begin(), builder->idx.end());
             row.assign(builder->row.begin(), builder->row.end());
             col.assign(builder->col.begin(), builder->col.end());
@@ -259,7 +305,7 @@ class matrix {
             return row.size() - 1;
         }
 
-        /// Begin boost::zip_iterator to columns/values for a given row.
+        /// Returns boost::zip_iterator to start of columns/values range for a given row.
         const_row_iterator begin(size_t i) const {
             assert(!builder && i < rows);
 
@@ -274,7 +320,7 @@ class matrix {
                     );
         }
 
-        /// End boost::zip_iterator to columns/values for a given row.
+        /// Returns boost::zip_iterator to end of columns/values range for a given row.
         const_row_iterator end(size_t i) const {
             assert(!builder && i < rows);
 
