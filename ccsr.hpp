@@ -45,6 +45,7 @@ THE SOFTWARE.
 #include <type_traits>
 #include <memory>
 #include <functional>
+#include <numeric>
 #include <cassert>
 
 #include <boost/unordered_set.hpp>
@@ -109,7 +110,8 @@ class matrix {
     static_assert(std::is_signed<col_t>::value, "Column type should be signed!");
 
     private:
-        size_t rows, cols;
+        size_t nrows, ncols, nnz;
+        val_t  eps;
 
         std::vector< idx_t > idx;
         std::vector< row_t > row;
@@ -191,8 +193,8 @@ class matrix {
 
             boost::unordered_set<row_range, row_hasher, row_hasher> index;
 
-            builder_t(size_t rows, val_t eps = 1e-5f)
-                : idx(rows, 0), hasher(eps), index(1979, hasher, hasher)
+            builder_t(size_t nrows, val_t eps)
+                : idx(nrows, 0), hasher(eps), index(1979, hasher, hasher)
             {
                 // Artificial empty row:
                 row.push_back(0);
@@ -280,8 +282,9 @@ class matrix {
                 > const_row_iterator;
 
         /// Constructor.
-        matrix(size_t rows, size_t cols, val_t eps = 1e-5)
-            : rows(rows), cols(cols), builder(new builder_t(rows, eps))
+        matrix(size_t nrows, size_t ncols, val_t eps = 1e-5)
+            : nrows(nrows), ncols(ncols), nnz(0), eps(eps),
+              builder(new builder_t(nrows, eps))
         {
         }
 
@@ -298,7 +301,7 @@ class matrix {
         }
 
         /// All rows have been processed; finalize the construction phase.
-        size_t finish() {
+        void finish() {
             assert(builder);
 
             idx.assign(builder->idx.begin(), builder->idx.end());
@@ -308,12 +311,20 @@ class matrix {
 
             builder.reset();
 
+            nnz = std::accumulate(idx.begin(), idx.end(), static_cast<size_t>(0),
+                    [&](size_t tot, size_t p) {
+                        return tot + row[p + 1] - row[p];
+                    });
+        }
+
+        /// Number of unique rows in the matrix.
+        size_t unique_rows() const {
             return row.size() - 1;
         }
 
         /// Returns boost::zip_iterator to start of columns/values range for a given row.
         const_row_iterator begin(size_t i) const {
-            assert(!builder && i < rows);
+            assert(!builder && i < nrows);
 
             return boost::make_zip_iterator(
                     boost::make_tuple(
@@ -328,7 +339,7 @@ class matrix {
 
         /// Returns boost::zip_iterator to end of columns/values range for a given row.
         const_row_iterator end(size_t i) const {
-            assert(!builder && i < rows);
+            assert(!builder && i < nrows);
 
             return boost::make_zip_iterator(
                     boost::make_tuple(
@@ -340,6 +351,72 @@ class matrix {
                         )
                     );
         }
+
+        /// Number of rows.
+        size_t rows() const {
+            return nrows;
+        }
+
+        /// Number of cols.
+        size_t cols() const {
+            return ncols;
+        }
+
+        /// Number of nonzeros in the matrix.
+        size_t non_zeros() const {
+            assert(!builder);
+
+            return nnz;
+        }
+
+        /// Compression ratio.
+        double compression() const {
+            assert(!builder);
+            return 1.0 *
+                (
+                 sizeof(idx[0]) * idx.size() +
+                 sizeof(row[0]) * row.size() +
+                 sizeof(col[0]) * col.size() +
+                 sizeof(val[0]) * val.size()
+                ) /
+                (
+                    sizeof(row[0]) * (nrows + 1) +
+                    sizeof(col[0]) * nnz        +
+                    sizeof(val[0]) * nnz
+                );
+        }
+
+
+        friend matrix transp(const matrix &A) {
+            std::vector<row_t> row(A.ncols + 1, 0);
+            std::vector<col_t> col(A.nnz);
+            std::vector<val_t> val(A.nnz);
+
+            for(size_t i = 0; i < A.nrows; ++i)
+                for(auto j = A.begin(i), e = A.end(i); j != e; ++j)
+                    ++( row[boost::get<0>(*j) + 1] );
+
+            std::partial_sum(row.begin(), row.end(), row.begin());
+
+            for(size_t i = 0; i < A.nrows; ++i) {
+                for(auto j = A.begin(i), e = A.end(i); j != e; ++j) {
+                    row_t head = row[ boost::get<0>(*j) ]++;
+
+                    col[head] = i;
+                    val[head] = boost::get<1>(*j);
+                }
+            }
+
+            std::rotate(row.begin(), row.end() - 1, row.end());
+            row[0] = 0;
+
+            matrix T(A.ncols, A.nrows, A.eps);
+            T.insert(0, A.ncols, row.data(), col.data(), val.data());
+            T.finish();
+
+            return T;
+        }
+
 };
 
 } // namespace ccsr
