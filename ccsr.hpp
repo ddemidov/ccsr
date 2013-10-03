@@ -417,6 +417,49 @@ class matrix {
             return T;
         }
 
+        friend matrix prod(const matrix &A, const matrix &B) {
+            matrix C(A.nrows, B.ncols, std::max(A.eps, B.eps));
+
+            std::vector<col_t> marker(B.ncols, -1);
+
+            row_t row[2] = {0, 0};
+            std::vector<col_t> col;
+            std::vector<val_t> val;
+
+            for(size_t ia = 0; ia < A.nrows; ++ia) {
+                col.clear();
+                val.clear();
+
+                for(auto ja = A.begin(ia), ea = A.end(ia); ja != ea; ++ja) {
+                    col_t ca = boost::get<0>(*ja);
+                    val_t va = boost::get<1>(*ja);
+
+                    for(auto jb = B.begin(ca), eb = B.end(ca); jb != eb; ++jb) {
+                        col_t cb = boost::get<0>(*jb);
+                        val_t vb = boost::get<1>(*jb);
+
+                        if (marker[cb] < 0) {
+                            marker[cb] = col.size();
+                            col.push_back(cb);
+                            val.push_back(va * vb);
+                        } else {
+                            val[marker[cb]] += va * vb;
+                        }
+                    }
+                }
+
+                for(auto c = col.begin(); c != col.end(); ++c)
+                    marker[*c] = -1;
+
+                row[1] = col.size();
+
+                C.insert(ia, ia + 1, row, col.data(), val.data());
+            }
+
+            C.finish();
+            return C;
+        }
+
 };
 
 } // namespace ccsr

@@ -76,4 +76,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    auto C = prod(A, A);
+
+    std::cout
+        << "Unique rows: " << C.unique_rows() << std::endl
+        << "Nonzeros:    " << C.non_zeros()   << std::endl
+        << "Compression: " << C.compression() << std::endl
+        << std::endl;
+
+    if (n < 20) {
+        for(size_t row = 0; row < n * n; ++row) {
+            for(auto i = C.begin(row); i != C.end(row); ++i)
+                std::cout
+                    << boost::get<1>(*i) << "("
+                    << boost::get<0>(*i) << ") ";
+            std::cout << std::endl;
+        }
+    }
+
 }
