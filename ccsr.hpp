@@ -19,7 +19,6 @@
 #include <type_traits>
 #include <memory>
 #include <functional>
-#include <exception>
 #include <cassert>
 
 #include <boost/unordered_set.hpp>
@@ -149,10 +148,24 @@ class matrix {
 
             boost::unordered_set<row_range, row_hasher, row_hasher> index;
 
-            builder_t(val_t eps = 1e-5f)
-                : hasher(eps), index(1979, hasher, hasher)
+            builder_t(size_t rows, val_t eps = 1e-5f)
+                : idx(rows, 0), hasher(eps), index(1979, hasher, hasher)
             {
+                // Artificial empty row:
                 row.push_back(0);
+                row.push_back(0);
+
+                index.insert(
+                        boost::make_tuple(
+                            boost::make_zip_iterator(
+                                boost::make_tuple(col.begin(), val.begin())
+                                ),
+                            boost::make_zip_iterator(
+                                boost::make_tuple(col.end(), val.end())
+                                ),
+                            index.size()
+                            )
+                        );
             }
 
             void insert(col_t row_begin, col_t row_end,
@@ -177,7 +190,7 @@ class matrix {
                     auto pos = index.find(range, hasher, hasher);
 
                     if (pos == index.end()) {
-                        idx.push_back(index.size());
+                        idx[i] = index.size();
 
                         size_t start = val.size();
 
@@ -205,7 +218,7 @@ class matrix {
 
                         row.push_back(val.size());
                     } else {
-                        idx.push_back(boost::get<2>(*pos));
+                        idx[i] = boost::get<2>(*pos);
                     }
                 }
             }
@@ -225,7 +238,7 @@ class matrix {
 
         /// Constructor.
         matrix(size_t rows, size_t cols, val_t eps = 1e-5)
-            : rows(rows), cols(cols), builder(new builder_t(eps))
+            : rows(rows), cols(cols), builder(new builder_t(rows, eps))
         {
         }
 
@@ -236,11 +249,6 @@ class matrix {
         }
 
         size_t finish() {
-            if (builder->idx.size() != rows) throw std::logic_error(
-                    "Matrix construction is incomplete "
-                    "(some rows are left untouched)"
-                    );
-
             idx.assign(builder->idx.begin(), builder->idx.end());
             row.assign(builder->row.begin(), builder->row.end());
             col.assign(builder->col.begin(), builder->col.end());
