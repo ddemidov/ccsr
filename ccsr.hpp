@@ -30,10 +30,13 @@ THE SOFTWARE.
  * \author Denis Demidov <ddemidov@ksu.ru>
  * \brief  Lossy compression for CSR sparse matrix format.
  *
- * Stores unique matrix rows, where uniqueness is determined approximately.
- * If the precision loss is not important (e.g. coefficients come from an
- * experiment with incorporated observation error), it may result in
- * significant storage savings for large matrices.
+ * Each row is stored as a pointer to a table of unique matrix rows, where
+ * uniqueness is determined approximately.  This may result in significant
+ * storage space savings in case matrix has regular structure (e.g. it
+ * represents a Poisson problem in a domain with piecewise-constant or slowly
+ * changing properties).  The precision loss is possible, but may not be
+ * important (e.g.  coefficients come from an experiment with incorporated
+ * observation error).
  */
 
 
@@ -88,10 +91,13 @@ inline size_t hash(const T &v) {
 
 /// Lossy compression for CSR sparse matrix format.
 /**
- * Stores unique matrix rows, where uniqueness is determined approximately.
- * If the precision loss is not important (e.g. coefficients come from an
- * experiment with incorporated observation error), it may result in
- * significant storage savings for large matrices.
+ * Each row is stored as a pointer to a table of unique matrix rows, where
+ * uniqueness is determined approximately.  This may result in significant
+ * storage space savings in case matrix has regular structure (e.g. it
+ * represents a Poisson problem in a domain with piecewise-constant or slowly
+ * changing properties).  The precision loss is possible, but may not be
+ * important (e.g.  coefficients come from an experiment with incorporated
+ * observation error).
 */
 template <
     typename val_t = double,
