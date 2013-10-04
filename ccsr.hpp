@@ -387,36 +387,73 @@ class matrix {
         }
 
 
+        /// Matrix transpose.
         friend matrix transp(const matrix &A) {
-            std::vector<row_t> row(A.ncols + 1, 0);
-            std::vector<col_t> col(A.nnz);
-            std::vector<val_t> val(A.nnz);
+            const col_t chunk_size = 1024;
 
-            for(size_t i = 0; i < A.nrows; ++i)
-                for(auto j = A.begin(i), e = A.end(i); j != e; ++j)
-                    ++( row[boost::get<0>(*j) + 1] );
-
-            std::partial_sum(row.begin(), row.end(), row.begin());
-
-            for(size_t i = 0; i < A.nrows; ++i) {
-                for(auto j = A.begin(i), e = A.end(i); j != e; ++j) {
-                    row_t head = row[ boost::get<0>(*j) ]++;
-
-                    col[head] = i;
-                    val[head] = boost::get<1>(*j);
+            col_t lw = 0, rw = 0;
+            for(size_t i = 0, n = A.unique_rows(); i < n; ++i) {
+                for(row_t j = A.row[i]; j < A.row[i + 1]; ++j) {
+                    lw = std::max(lw, -A.col[j]);
+                    rw = std::max(rw,  A.col[j]);
                 }
             }
 
-            std::rotate(row.begin(), row.end() - 1, row.end());
-            row[0] = 0;
-
             matrix T(A.ncols, A.nrows, A.eps);
-            T.insert(0, A.ncols, row.data(), col.data(), val.data());
+
+            std::vector<row_t> row;
+            std::vector<col_t> col;
+            std::vector<val_t> val;
+
+            for(col_t chunk = 0; chunk < A.nrows; chunk += chunk_size) {
+                col_t row_start = std::max(chunk - rw,              static_cast<col_t>(0));
+                col_t row_end   = std::min(chunk + chunk_size + lw, static_cast<col_t>(A.nrows));
+                col_t chunk_end = std::min(chunk + chunk_size,      static_cast<col_t>(A.nrows));
+
+                row.clear();
+                col.clear();
+                val.clear();
+
+                row.resize(chunk_size + 1, 0);
+
+                for(col_t i = row_start; i < row_end; ++i)
+                    for(auto j = A.begin(i), e = A.end(i); j != e; ++j) {
+                        col_t c = boost::get<0>(*j);
+                        if (c >= chunk && c < chunk_end)
+                            ++( row[c - chunk + 1] );
+                    }
+
+                std::partial_sum(row.begin(), row.end(), row.begin());
+
+                col.resize(row.back());
+                val.resize(row.back());
+
+                for(size_t i = row_start; i < row_end; ++i) {
+                    for(auto j = A.begin(i), e = A.end(i); j != e; ++j) {
+                        col_t c = boost::get<0>(*j);
+                        val_t v = boost::get<1>(*j);
+
+                        if (c >= chunk && c < chunk_end) {
+                            row_t head = row[c - chunk]++;
+
+                            col[head] = i;
+                            val[head] = v;
+                        }
+                    }
+                }
+
+                std::rotate(row.begin(), row.end() - 1, row.end());
+                row[0] = 0;
+
+                T.insert(chunk, chunk_end, row.data(), col.data(), val.data());
+            }
+
             T.finish();
 
             return T;
         }
 
+        /// Matrix-matrix product.
         friend matrix prod(const matrix &A, const matrix &B) {
             matrix C(A.nrows, B.ncols, std::max(A.eps, B.eps));
 
