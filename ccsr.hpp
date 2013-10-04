@@ -389,7 +389,7 @@ class matrix {
 
         /// Matrix transpose.
         friend matrix transp(const matrix &A) {
-            const col_t chunk_size = 1024;
+            const col_t chunk_size = 4096;
 
             col_t lw = 0, rw = 0;
             for(size_t i = 0, n = A.unique_rows(); i < n; ++i) {
