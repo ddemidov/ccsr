@@ -1,9 +1,14 @@
 #include <iostream>
+#include <chrono>
 #include <ccsr.hpp>
+#include <amgcl/profiler.hpp>
 
 int main(int argc, char *argv[]) {
     const int n = argc < 2 ? 4 : std::stoi(argv[1]);
 
+    amgcl::profiler<std::chrono::high_resolution_clock> prof;
+
+    prof.tic("assemble");
     ccsr::matrix<double, int, int> A(n * n, n * n);
 
     std::vector<int>    row;
@@ -41,6 +46,7 @@ int main(int argc, char *argv[]) {
     }
 
     A.finish();
+    prof.toc("assemble");
 
     std::cout
         << "Unique rows: " << A.unique_rows() << std::endl
@@ -58,7 +64,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    prof.tic("transpose");
     auto B = transp(A);
+    prof.toc("transpose");
 
     std::cout
         << "Unique rows: " << B.unique_rows() << std::endl
@@ -76,7 +84,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    prof.tic("multiply");
     auto C = prod(A, A);
+    prof.toc("multiply");
 
     std::cout
         << "Unique rows: " << C.unique_rows() << std::endl
@@ -94,4 +104,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    std::cout << prof << std::endl;
 }
